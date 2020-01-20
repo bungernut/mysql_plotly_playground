@@ -15,8 +15,8 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app_color = {"graph_bg": "#082255", "graph_line": "#007ACE"}
 
-app.layout = html.Div(children=[
-    html.H1(children='Hello Dash'),
+app.layout = html.Div(
+    children=[
 
     dcc.Graph(
         id="agraph",
@@ -27,32 +27,83 @@ app.layout = html.Div(children=[
             )
         ),
     ),
+
     dcc.Interval(
         id="data-update",
         interval=int(GRAPH_INTERVAL),
         n_intervals=0,
-    )
+    ),
+
+    dcc.DatePickerSingle(
+        id='dps_start_date',
+        date=datetime.date.today()
+    ),
+    
+    dcc.Input(
+        id='dps_start_timetxt',
+        placeholder='00:00:00',
+        type='text',
+        value='00:00:00'
+    ),
+
+    dcc.DatePickerSingle(
+        id='dps_end_date',
+        date=datetime.date.today()
+    ),
+    
+    dcc.Input(
+        id='dps_end_timetxt',
+        placeholder=datetime.datetime.now().strftime("%H:%M:%S"),
+        type='text',
+        value='00:00:00',
+        disabled = False
+    ),  
+    dcc.Checklist(
+        id="isLiveData",
+        options=[
+            {'label': 'Live', 'value': 'LiveData'}
+        ],
+        value=['LiveData']
+    ),  
 ])
 
-def get_current_time():
-    """ Helper function to get the current time in seconds. """
-    now = datetime.datetime.now()
-    total_time = (now.hour * 3600) + (now.minute * 60) + (now.second)
-    return total_time
+@app.callback(
+    Output("data-update","interval"),
+    [
+        Input("isLiveData","value")
+    ]
+)
+def toggle_liveupdate(LiveDataValue):
+    if 'LiveData' in LiveDataValue:
+        return int(1000)
+    else:
+        return int(1000*60*24)
 
 @app.callback(
-    Output("agraph", "figure"), [Input("data-update", "n_intervals")]
+    Output("agraph", "figure"), 
+    [
+        Input("data-update", "n_intervals"), 
+        Input("dps_start_date", "date"),
+        Input("dps_start_timetxt", "value"),
+        Input("isLiveData", "value")
+    ]
 )
-def gen_data_graph(interval):
-    t0 = datetime.datetime.now() - datetime.timedelta(seconds=3600)
+def gen_data_graph(interval, startdt, starttime, LiveDataValue):
+    isLive = False
+    if startdt != None and starttime != None:
+        t0 = parse_date_timetxt(startdt, starttime)
+    else:
+        t0 = datetime.datetime.now() - datetime.timedelta(seconds=3600)
+
     tf = datetime.datetime.now()
+    
     data = get_data(t0,tf)
     trace = dict(
         type="scatter",
         x = data["time"],
         y = data["v1"],
-        line = {'color':'#42C4F7'},
-        mode = "lines"
+        line = {'color':'#F2C417'},
+        mode = "lines+markers"
     )
     layout = dict(
         plot_bgcolor=app_color["graph_bg"],
@@ -60,7 +111,7 @@ def gen_data_graph(interval):
         font={"color": "#fff"},
         height=700,
         xaxis={
-            "showline": True,
+            "showline": False,
             "title": "Time",
         },
         yaxis={
@@ -78,6 +129,11 @@ def gen_data_graph(interval):
     )
     return dict(data=[trace], layout=layout)
 
+
+def parse_date_timetxt(date,timetxt):
+    time_h, time_m, time_s = timetxt.split(':')
+    dtdate = datetime.datetime.strptime(date.split(' ')[0], '%Y-%m-%d')
+    return datetime.datetime(dtdate.year, dtdate.month, dtdate.day, int(time_h), int(time_m), int(time_s))
 
 def get_data(t0,tf):
     if type(t0) == datetime.datetime:
@@ -103,6 +159,12 @@ def get_db_conn_read():
                     port=3308,
                     cursorclass=pymysql.cursors.DictCursor)
     return connection
+
+def get_current_time():
+    """ Helper function to get the current time in seconds. """
+    now = datetime.datetime.now()
+    total_time = (now.hour * 3600) + (now.minute * 60) + (now.second)
+    return total_time
 
 if __name__ == '__main__':
     app.run_server(debug=True)
