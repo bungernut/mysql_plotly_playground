@@ -1,0 +1,14 @@
+version: '3'
+# https://medium.com/better-programming/setting-up-mysql-database-in-a-docker-d6c69a3e9afe
+
+services:
+
+  mysql-development:
+    image: mysql:8.0.19
+    hostname: 'mysqlhost'
+    environment:
+      MYSQL_ROOT_PASSWORD: x3n0n136
+      MYSQL_DATABASE: lab206
+    ports:
+      - "3308:3306" 
+      #continaer 3306, host 3308
